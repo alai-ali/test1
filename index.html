@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSMLH - Digital Fortress</title>
+    <style>
+        :root { --gold: #f6851b; --dark: #121212; --card: #1e1e1e; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--dark); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; overflow-x: hidden; }
+        .container { background: var(--card); padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.8); text-align: center; width: 90%; max-width: 450px; border: 1px solid #333; transition: all 0.5s ease; }
+        h2 { color: var(--gold); letter-spacing: 2px; margin-bottom: 5px; }
+        .subtitle { color: #888; font-size: 0.9em; margin-bottom: 25px; }
+        button { background: var(--gold); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; width: 100%; font-weight: bold; font-size: 16px; margin: 10px 0; transition: transform 0.2s; }
+        button:active { transform: scale(0.98); }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #333; border-radius: 10px; background: #252525; color: white; text-align: center; box-sizing: border-box; }
+        
+        /* Окно успеха */
+        #successWindow { display: none; opacity: 0; transform: translateY(20px); }
+        .success-card { border: 2px solid var(--gold); background: linear-gradient(145deg, #1e1e1e, #252525); padding: 25px; border-radius: 20px; }
+        .shield-icon { font-size: 50px; color: var(--gold); margin-bottom: 15px; }
+        .method-text { text-align: left; font-size: 0.95em; line-height: 1.6; color: #ccc; }
+        .highlight { color: var(--gold); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="registrationWindow" class="container">
+    <h2>BSMLH CORE</h2>
+    <div class="subtitle">Инициализация физического ключа</div>
+    
+    <button id="connectBtn">ШАГ 1: СВЯЗАТЬ КОШЕЛЕК</button>
+    <div id="walletAddress" style="font-size: 0.7em; color: #666; margin: 5px 0;">Статус: Ожидание...</div>
+    
+    <input type="text" id="huidInput" placeholder="UID Кольца (сканируйте чип)">
+    <button id="registerBtn">ШАГ 2: АКТИВИРОВАТЬ ЗАЩИТУ</button>
+    <div id="statusUpdate" style="font-size: 0.8em; color: var(--gold); margin-top: 10px;"></div>
+</div>
+
+<div id="successWindow" class="container">
+    <div class="success-card">
+        <div class="shield-icon">🛡️</div>
+        <h3>ЗАЩИТА АКТИВИРОВАНА</h3>
+        <div class="method-text">
+            Поздравляем! Ваш физический объект (Кольцо) успешно привязан к вашему цифровому следу в блокчейне <b>BNB Smart Chain</b>. <br><br>
+            <span class="highlight">В чем уникальность вашего метода?</span><br>
+            Вы только что создали связку, которую невозможно взломать удаленно. Ваша защита базируется на <b>двух факторах</b>: 
+            физическом присутствии уникального чипа и криптографической подписи вашего кошелька. <br><br>
+            Этой комбинации «железа» и кода <span class="highlight">пока нет аналогов в мире</span>. Теперь ваше кольцо — это не просто украшение, а персональный ключ высшего уровня безопасности.
+        </div>
+        <button onclick="location.reload()" style="margin-top: 20px; background: transparent; border: 1px solid var(--gold);">ЗАКРЫТЬ ПРОТОКОЛ</button>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+
+<script>
+    const contractAddress = "0xE307AfFB4b9eA6cf233CCfF440C4837e542891e7";
+    const contractABI = [{"inputs":[{"internalType":"string","name":"_huid","type":"string"}],"name":"registerHUID","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+
+    let signer;
+    let contract;
+
+    // Автозаполнение из NFC
+    window.addEventListener('load', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ringUid = urlParams.get('huid');
+        if (ringUid) {
+            document.getElementById('huidInput').value = ringUid;
+        }
+    });
+
+    async function connect() {
+        if (window.ethereum) {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+                document.getElementById('walletAddress').innerText = "Подключен: " + accounts[0].substring(0,6) + "...";
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+            } catch (err) { alert("Ошибка: " + err.message); }
+        } else { alert("Откройте в MetaMask!"); }
+    }
+
+    async function register() {
+        const huid = document.getElementById('huidInput').value;
+        if (!contract) return alert("Сначала шаг 1!");
+        if (!huid) return alert("UID кольца пуст!");
+
+        try {
+            const tx = await contract.registerHUID(huid);
+            document.getElementById('statusUpdate').innerText = "Запись в блокчейн... Подождите.";
+            await tx.wait();
+            
+            // ПЕРЕХОД К ОКНУ УСПЕХА
+            showSuccess();
+        } catch (err) { 
+            alert("Ошибка транзакции. Возможно, этот UID уже занят."); 
+        }
+    }
+
+    function showSuccess() {
+        const regWin = document.getElementById('registrationWindow');
+        const successWin = document.getElementById('successWindow');
+        
+        regWin.style.display = 'none';
+        successWin.style.display = 'block';
+        setTimeout(() => {
+            successWin.style.opacity = '1';
+            successWin.style.transform = 'translateY(0)';
+        }, 10);
+    }
+
+    document.getElementById('connectBtn').onclick = connect;
+    document.getElementById('registerBtn').onclick = register;
+</script>
+
+</body>
+</html>
